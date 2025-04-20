@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore", message="Failed to load image Python extension
 app = Flask(__name__)
 
 # Load model and tokenizer
-checkpoint = "HuggingFaceTB/SmolLM2-135M-Instruct"
+checkpoint = "HuggingFaceTB/SmolLM2-360M-Instruct"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model = AutoModelForCausalLM.from_pretrained(checkpoint).to(device)
@@ -21,22 +21,40 @@ def index():
     response = ""
     if request.method == "POST":
         user_query = request.form["query"]
+        mode = request.form.get("mode", "web")  # Default to web search mode
 
-        # Get context from the web
-        try:
-            context = web_search(user_query)
-        except Exception as e:
-            context = "No additional context could be retrieved."
-            print("Web search failed:", e)
+        # Different prompts based on mode
+        if mode == "web":
+            try:
+                context = web_search(user_query)
+            except Exception as e:
+                context = "No additional context could be retrieved."
+                print("Web search failed:", e)
 
-        # System prompt setup with context included
-        messages = [
-            {"role": "system", "content": (
+            system_prompt = (
                 "You are a voice assistant that answers in a polite and professional tone. "
                 "Use the following context to help answer the question:\n"
                 f"{context}\n"
                 "If the context is insufficient, still try to give the best possible answer."
-            )},
+            )
+        elif mode == "reasoning":
+            system_prompt = (
+                "You are a voice assistant specialized in logical reasoning and problem-solving. "
+                "Break down the problem systematically and explain your thought process step by step. "
+                "Consider different angles and approaches to arrive at a well-reasoned conclusion."
+            )
+            context = ""
+        else:  # creative mode
+            system_prompt = (
+                "You are a voice assistant with a flair for creative and imaginative responses. "
+                "Think outside the box and provide unique, innovative perspectives while maintaining "
+                "relevance to the query. Feel free to use metaphors, analogies, and vivid descriptions."
+            )
+            context = ""
+
+        # System prompt setup with context included
+        messages = [
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_query}
         ]
 
@@ -63,3 +81,4 @@ def index():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
